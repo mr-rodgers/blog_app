@@ -9,7 +9,7 @@ queries.
 
 The application is built to run on asynchronous Python 3.9, using a 
 Code-first approach to declaring GraphQL schemas 
-(see #strawberry-graphql/strawberry).
+(see https://github.com/strawberry-graphql/strawberry).
 
 Authentication is handled using **Auth0**, and users are logged in 
 using a passwordless email link. 
@@ -153,7 +153,7 @@ In both cases, the console will show which port the server listens on.
 ## Usage
 
 The server is a GraphQL server, listening for GraphQL requests at `/graphql`. The local server also has an instance of
-GraphiQL tools running at `http://localhost:<port>/graphl`. This can be used to inspect the available queries and mutations.
+GraphiQL tools running at `http://localhost:<port>/graphql`. This can be used to inspect the available queries and mutations.
 
 This section gives a brief overview of how the server is expected to be used.
 
