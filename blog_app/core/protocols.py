@@ -47,7 +47,9 @@ class AppReaction:
     id: int
     comment_id: int
     reaction_type: AppReactionType
+    author_id: strawberry.ID
     author: Person
+    updated: datetime
 
 
 @strawberry.interface(name="Comment")
@@ -57,7 +59,10 @@ class AppComment:
     content: str
     author_id: strawberry.ID
     author: Person
-    reactions: Collection[AppReaction]
+    reactions: Collection[AppReaction] = strawberry.field(
+        description="Return all reactions which have been set on this comment,"
+        " wrapped in a `Collection`."
+    )
     created: datetime
     updated: datetime
 
@@ -69,7 +74,10 @@ class AppPost:
     author: Person
     title: str
     content: str
-    comments: Collection[AppComment]
+    comments: Collection[AppComment] = strawberry.field(
+        description="Return all comments which have been added to this post,"
+        " wrapped in a `Collection`."
+    )
     created: datetime
     updated: datetime
 

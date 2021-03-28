@@ -44,7 +44,7 @@ class Post(AppPost):
     created: datetime
     updated: datetime
 
-    @strawberry.field()
+    @strawberry.field
     async def author(self, info: Info[AppContext, AppRequest]) -> Person:
         # ignore type error because we don't expect this to resolve
         # null; this should trigger a low-level gql error instead if this does

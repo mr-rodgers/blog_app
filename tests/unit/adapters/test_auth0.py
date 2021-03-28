@@ -9,7 +9,7 @@ from blog_app.adapters.auth0 import Auth0Authenticator, Auth0AuthenticatorSettin
 from blog_app.auth.types import (
     AuthError,
     AuthErrorReason,
-    Authorization,
+    Authentication,
     LoginCodeTransport,
     User,
 )
@@ -216,7 +216,7 @@ async def test_verify_login_code(
     }
 
     assert last_request.json() == expected_request_data
-    assert isinstance(result.collapse(), Authorization)
+    assert isinstance(result.collapse(), Authentication)
 
 
 @pytest.mark.parametrize("code", ["cCI6IkpXVCIsIm"])
@@ -308,7 +308,7 @@ async def test_refresh_access_token(
     }
 
     assert last_request.json() == expected_request_data
-    assert isinstance(result.collapse(), Authorization)
+    assert isinstance(result.collapse(), Authentication)
 
 
 @pytest.mark.parametrize(

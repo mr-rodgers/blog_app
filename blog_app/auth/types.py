@@ -69,7 +69,7 @@ class User(Person):
 
 
 @strawberry.type
-class Authorization:
+class Authentication:
     user: User
     access_token: str
     refresh_token: str

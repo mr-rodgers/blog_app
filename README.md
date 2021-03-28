@@ -9,7 +9,7 @@ queries.
 
 The application is built to run on asynchronous Python 3.9, using a 
 Code-first approach to declaring GraphQL schemas 
-(see #strawberry-graphql/strawberry).
+(see https://github.com/strawberry-graphql/strawberry).
 
 Authentication is handled using **Auth0**, and users are logged in 
 using a passwordless email link. 
@@ -75,7 +75,7 @@ application root folder:
 
 ```
 python -m pip install -U pip poetry
-poetry install --no-dev
+poetry install
 ```
 
 Note that these instructions will isolate dependencies within a virtualenv,
@@ -118,17 +118,17 @@ connection_url = "mysql+aiomysql://<mysql-user>:<mysql-password>@<mysql-host>:<m
 
 Make the following replacements:
 
-| Replacement                  | Description                                                                                    |
-|------------------------------|------------------------------------------------------------------------------------------------|
-| <auth0-domain>               | The *domain* from your Auth0 Regular Web Application                                           |
-| <auth0-client-id>            | Likewise, *client id*                                                                          |
-| <auth0-client-secret>        | ... the *client secret*                                                                        |
-| <auth0-management-api-token> | The temporary management API token that you generated                                          |
-| <mysql-host>                 | The hostname or ip address from which your MySQL instance can be reached                       |
-| <mysql-port>                 | The port number that MySQL listens on                                                          |
-| <mysql-database>             | The name of the database that you created for this application, hosted with the MySQL instance |
-| <mysql-user>                 | The user which has full access to the above database                                           |
-| <mysql-password>             | The password which authenticates the above user                                                |
+| Replacement                    | Description                                                                                    |
+|--------------------------------|------------------------------------------------------------------------------------------------|
+| `<auth0-domain>`               | The *domain* from your Auth0 Regular Web Application                                           |
+| `<auth0-client-id>`            | Likewise, *client id*                                                                          |
+| `<auth0-client-secret>`        | ... the *client secret*                                                                        |
+| `<auth0-management-api-token>` | The temporary management API token that you generated                                          |
+| `<mysql-host>`                 | The hostname or ip address from which your MySQL instance can be reached                       |
+| `<mysql-port>`                 | The port number that MySQL listens on                                                          |
+| `<mysql-database>`             | The name of the database that you created for this application, hosted with the MySQL instance |
+| `<mysql-user>`                 | The user which has full access to the above database                                           |
+| `<mysql-password>`             | The password which authenticates the above user                                                |
 
 (When running using the pre-configured `docker-compose.yml` configuration, the `<mysql-host>` would be `mysql`. The remaining
 `<mysql-*>` fields should be copied from the docker-compose configuration.)
@@ -150,12 +150,18 @@ environment variable to the location of this file.
 
 In both cases, the console will show which port the server listens on.
 
-## Making queries
+## Usage
 
 The server is a GraphQL server, listening for GraphQL requests at `/graphql`. The local server also has an instance of
-GraphiQL tools running at `http://localhost:<port>/graphl`. This can be used to inspect the available queries and mutations.
+GraphiQL tools running at `http://localhost:<port>/graphql`. This can be used to inspect the available queries and mutations.
 
-An incomplete list of available querys:
+This section gives a brief overview of how the server is expected to be used.
+
+### Making queries
+
+All queries to the system use the top-level `posts` GraphQL query. It does not require
+authentication. The query and the types that it returns are documented on the GraphQL
+server, but a summary of queries is shown below:
 
 
 **Get all post ids and titles**
@@ -223,7 +229,7 @@ posts {
 **Get all comments on a post**
 ```graphql
 posts {
-  byId(ids: [15]) {
+  byId(ids: 15) {
     comments {
       allItems {
         id
@@ -249,4 +255,28 @@ posts {
   }
 }
 ```
+
+### Authentication 
+
+**All post, comment and reaction mutations require authentication.** Authentication is only supported
+using special one-time-use codes which are emailed to the user. Upon authenticating with a code, an
+access token is provided which can be supplied as a bearer token when querying the mutations which require authorization.
+This can be done by setting the `Authorization Bearer <the access token>` header when making GraphQL
+requests that contain such mutations. Note, however, that access tokens have a short time to live,
+and need to be periodically refreshed (using the supplied `refreshLogin` mutation)
+
+The following workflow must be used to retrieve (and refresh) access tokens:
+
+1. Use `sendLoginCode` mutation to send a login code to the user's email address.
+2. After the user retrieves the login code, use the `loginWithCode` mutation to retrieve an access token, as well as a refresh token that can be used to get a new access token.
+3. When the access token expires, use the `refreshLogin` mutation with the last refresh token to get a new access token and refresh token.
+
+
+### Authorization
+
+All post, comment and reaction mutations follow a simple authorization model:
+
+- New items may be created by any authenticated user.
+- Existing items may only be updated by the user who created them.
+- Items may only be removed by the user who created them.
 

@@ -1,7 +1,7 @@
 from typing import List, Optional, Protocol
 
 from blog_app.core.types import GraphQLResult
-from .types import AuthError, Authorization, LoginCodeTransport, User
+from .types import AuthError, Authentication, LoginCodeTransport, User
 
 
 class Authenticator(Protocol):
@@ -28,7 +28,7 @@ class Authenticator(Protocol):
 
     async def login_with_code(
         self, code: str, login: str, login_type: LoginCodeTransport
-    ) -> GraphQLResult[Authorization, AuthError]:
+    ) -> GraphQLResult[Authentication, AuthError]:
         """
         Verify a login code and return an Authentication.
 
@@ -46,7 +46,7 @@ class Authenticator(Protocol):
 
     async def refresh_access_token(
         self, refresh_token: str
-    ) -> GraphQLResult[Authorization, AuthError]:
+    ) -> GraphQLResult[Authentication, AuthError]:
         """
         Use a refresh token to get a new access token and return a new Authorization.
         """

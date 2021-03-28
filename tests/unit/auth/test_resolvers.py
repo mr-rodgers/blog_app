@@ -9,7 +9,7 @@ from strawberry.dataloader import DataLoader
 from blog_app.auth.types import (
     AuthError,
     AuthErrorReason,
-    Authorization,
+    Authentication,
     SendLoginCodeResponse,
     User,
 )
@@ -102,7 +102,7 @@ async def test_send_login_code_returns_auth_error_on_authenticator_exception(
         Result(error=AuthError.invalid_request("Something happened")),
         Result(error=AuthError.invalid_token("Something happened")),
         Result(
-            value=Authorization(
+            value=Authentication(
                 user=User(id=strawberry.ID("foo"), name="Someone's Name"),
                 access_token="foo",
                 refresh_token="bar",

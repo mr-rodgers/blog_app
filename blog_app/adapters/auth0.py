@@ -19,7 +19,7 @@ from blog_app.auth.protocols import Authenticator
 from blog_app.auth.types import (
     AuthError,
     AuthErrorReason,
-    Authorization,
+    Authentication,
     LoginCodeTransport,
     User,
 )
@@ -64,9 +64,9 @@ class Auth0Authenticator(Authenticator):
 
     async def _handle_token_response(
         self, data: Any
-    ) -> GraphQLResult[Authorization, AuthError]:
+    ) -> GraphQLResult[Authentication, AuthError]:
         try:
-            auth = Authorization(
+            auth = Authentication(
                 access_token=data["id_token"],
                 refresh_token=data["refresh_token"],
                 expires_in=data["expires_in"],
@@ -136,7 +136,7 @@ class Auth0Authenticator(Authenticator):
 
     async def refresh_access_token(
         self, refresh_token: str
-    ) -> GraphQLResult[Authorization, AuthError]:
+    ) -> GraphQLResult[Authentication, AuthError]:
         controller = GetToken(self.settings.domain)
         request_data = {
             "grant_type": "refresh_token",

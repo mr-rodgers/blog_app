@@ -7,6 +7,7 @@ from blog_app.core import (
     AppContext,
     AppRequest,
     AppError,
+    AppPost,
     InternalError,
     ItemNotFoundError,
 )
@@ -21,7 +22,6 @@ from blog_app.common.logic import (
 )
 from .context import Context
 from .types import (
-    Post,
     PostCreationResponse,
     PostDeletionResponse,
     PostTitle,
@@ -59,7 +59,7 @@ def get_posts_model(info: Info[AppContext, AppRequest]):
     return cast(Context, info.context.posts).model
 
 
-async def get_posts(info: Info[AppContext, AppRequest]) -> QueryableCollection[Post]:
+async def get_posts(info: Info[AppContext, AppRequest]) -> QueryableCollection[AppPost]:
     return QueryableCollection(loader=get_loader(info))
 
 

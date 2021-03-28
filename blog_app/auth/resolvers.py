@@ -5,7 +5,7 @@ from strawberry.types import Info
 from blog_app.core import AppContext, AppRequest, InternalError
 from .types import (
     AuthError,
-    Authorization,
+    Authentication,
     LoginCodeTransport,
     SendLoginCodeResponse,
 )
@@ -36,7 +36,7 @@ async def send_login_code(
 
 async def login_with_code(
     code: str, email_address: str, info: Info[AppContext, AppRequest]
-) -> Union[Authorization, AuthError]:
+) -> Union[Authentication, AuthError]:
     try:
         return (
             await get_authenticator(info).login_with_code(
@@ -49,7 +49,7 @@ async def login_with_code(
 
 async def refresh_login(
     refresh_token: str, info: Info[AppContext, AppRequest]
-) -> Union[Authorization, AuthError]:
+) -> Union[Authentication, AuthError]:
     try:
         return (
             await get_authenticator(info).refresh_access_token(refresh_token)

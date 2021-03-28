@@ -3,7 +3,7 @@ from pytest_mock import MockerFixture
 import strawberry
 
 from blog_app.core import Result
-from blog_app.auth.types import Authorization, AuthError, User
+from blog_app.auth.types import Authentication, AuthError, User
 from .conftest import GraphQLClient
 
 
@@ -30,9 +30,9 @@ def test_send_login_code(client: GraphQLClient, email: str, mocker: MockerFixtur
 
 
 @pytest.mark.parametrize(
-    "authorization",
+    "authentication",
     [
-        Authorization(
+        Authentication(
             access_token="foo",
             refresh_token="bar",
             user=User(id=strawberry.ID("id-1"), name="Foo Name"),
@@ -46,22 +46,22 @@ def test_login_with_code(
     client: GraphQLClient,
     email: str,
     code: str,
-    authorization: Authorization,
+    authentication: Authentication,
     mocker: MockerFixture,
 ):
     """
-    Check that loginWithCode() endpoint returns Authorization from
+    Check that loginWithCode() endpoint returns Authentication from
     configured authenticator.
     """
     mocker.patch(
         "blog_app.adapters.auth0.Auth0Authenticator.login_with_code"
-    ).return_value = Result(value=authorization)
+    ).return_value = Result(value=authentication)
 
     result = client.execute(
         """
         mutation loginWithCode($email: String!, $code: String!) {
             loginWithCode(emailAddress: $email, code: $code) {
-                ... on Authorization {
+                ... on Authentication {
                     accessToken
                     refreshToken
                     user {
@@ -78,9 +78,9 @@ def test_login_with_code(
     assert result.get("errors") is None
     assert result["data"] == {
         "loginWithCode": {
-            "accessToken": authorization.access_token,
-            "refreshToken": authorization.refresh_token,
-            "user": {"id": authorization.user.id, "name": authorization.user.name},
+            "accessToken": authentication.access_token,
+            "refreshToken": authentication.refresh_token,
+            "user": {"id": authentication.user.id, "name": authentication.user.name},
             "tokenType": "Bearer",
         }
     }

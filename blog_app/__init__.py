@@ -20,6 +20,7 @@ from .events import (
 )
 from .events.demo_pubsub import DemoPubsub
 from .posts.resolvers import get_posts, create_post, update_post, delete_post
+from .posts.types import Post
 from .reactions.resolvers import set_reaction, delete_reaction
 from .reactions.types import Reaction
 from .context import build_context
@@ -32,24 +33,65 @@ evts = Events()
 
 @strawberry.type
 class Query:
-    posts = strawberry.field(get_posts)
+    posts = strawberry.field(
+        get_posts, description="Retreive a queryable collection of posts."
+    )
 
 
 @strawberry.type
 class Mutation:
-    send_login_code = strawberry.field(send_login_code)
-    login_with_code = strawberry.field(login_with_code)
-    refresh_login = strawberry.field(refresh_login)
-    create_post = strawberry.field(create_post)
-    update_post = strawberry.field(evts.track(update_post, generating=PostUpdatedEvent))
-    delete_post = strawberry.field(evts.track(delete_post, generating=PostDeletedEvent))
-    add_comment = strawberry.field(
-        evts.track(add_comment, generating=CommentAddedEvent)
+    send_login_code = strawberry.field(
+        send_login_code,
+        description="Send a code to the provided email address, which can"
+        " be used with `loginWithCode` to authenticate.",
     )
-    update_comment = strawberry.field(update_comment)
-    delete_comment = strawberry.field(delete_comment)
-    set_reaction = strawberry.field(set_reaction)
-    delete_reaction = strawberry.field(delete_reaction)
+    login_with_code = strawberry.field(
+        login_with_code,
+        description="Authenticate using a code that was sent to the"
+        " provided email address using `sendLoginCode`",
+    )
+    refresh_login = strawberry.field(
+        refresh_login,
+        description="Re-authenticate using the `refreshToken` from the last"
+        " authentication.",
+    )
+    create_post = strawberry.field(
+        create_post,
+        description="Create a new post" " with supplied `title` and `content`.",
+    )
+    update_post = strawberry.field(
+        evts.track(update_post, generating=PostUpdatedEvent),
+        description="Update the post"
+        " with the given `id`, setting the `title` and `content` to new values"
+        " when provided.",
+    )
+    delete_post = strawberry.field(
+        evts.track(delete_post, generating=PostDeletedEvent),
+        description="Delete the post"
+        " with the given `id`. All attached comments (and reactions to those comments)"
+        " will also be deleted.",
+    )
+    add_comment = strawberry.field(
+        evts.track(add_comment, generating=CommentAddedEvent),
+        description="Add a comment to the post with the given `postId`.",
+    )
+    update_comment = strawberry.field(
+        update_comment, description="Update the comment with the given `id`."
+    )
+    delete_comment = strawberry.field(
+        delete_comment, description="Remove the comment with the given `id`."
+    )
+
+    # reaction mutations
+    set_reaction = strawberry.field(
+        set_reaction,
+        description="Set a reaction to the comment with the given `commentId`."
+        " Any previously set reactions by the logged in user to the same comment"
+        " are removed.",
+    )
+    delete_reaction = strawberry.field(
+        delete_reaction, description="Delete the reaction with the given `id`."
+    )
 
 
 @strawberry.type
@@ -74,7 +116,7 @@ class BlogApp(GraphQL):
         # These are types that strawberry can't detect because they aren't returned
         # directly from any resolver.
 
-        additional_types = [Comment, Reaction]
+        additional_types = [Post, Comment, Reaction]
         kwargs.setdefault(
             "schema",
             strawberry.Schema(
