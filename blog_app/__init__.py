@@ -178,6 +178,7 @@ class BlogApp(GraphQL):
             for error in result.errors:
                 logging.error("An unhandled application error has occurred.")
                 if error.original_error:
+                    logging.error(str(error.original_error))
                     logging.error(
                         "".join(traceback.format_tb(error.original_error.__traceback__))
                     )
@@ -185,5 +186,5 @@ class BlogApp(GraphQL):
         return data
 
 
-app = BlogApp(graphiql=False)
+app = BlogApp(debug=False, graphiql=False)
 _debug_app = BlogApp(debug=True, graphiql=True)

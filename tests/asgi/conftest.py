@@ -2,7 +2,6 @@ import asyncio
 import base64
 import pickle
 import random
-import time
 import warnings
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -15,13 +14,11 @@ import pytest
 import strawberry
 from pytest_factoryboy import LazyFixture, register
 from pytest_mock import MockerFixture
-from starlette.testclient import TestClient
 from strawberry.asgi.constants import (
     GQL_COMPLETE,
     GQL_CONNECTION_ACK,
     GQL_CONNECTION_INIT,
     GQL_CONNECTION_KEEP_ALIVE,
-    GQL_CONNECTION_TERMINATE,
     GQL_DATA,
     GQL_ERROR,
     GQL_START,
@@ -44,6 +41,7 @@ from .factories import (
     PostFactory,
     UserFactory,
 )
+from ._testclient import TestClient
 
 
 T = TypeVar("T", Post, Comment)
@@ -61,49 +59,44 @@ class GraphQLResponse(TypedDict):
     errors: Optional[List[Any]]
 
 
-class GraphQLSubscription(Iterator):
-    def __init__(self, ws, query: str, variables: Optional[dict] = None):
-        self.ws = ws
-        self.acked = False
-
-        ws.send_json({"type": GQL_CONNECTION_INIT})
+class GQLSubscription(Iterator):
+    @classmethod
+    @contextmanager
+    def _start(cls, *, client, query, variables):
         payload = {"query": query, "variables": {} if variables is None else variables}
-        self.op_id = str(hash(pickle.dumps(payload)))
-        ws.send_json({"type": GQL_START, "id": self.op_id, "payload": payload})
+        op_id = str(hash(pickle.dumps(payload)))
 
-    def __enter__(self):
-        return self
+        with client.websocket_connect("/", "graphql-ws") as ws:
+            ws.send_json({"type": GQL_CONNECTION_INIT})
+            assert ws.receive_json()["type"] == GQL_CONNECTION_ACK
 
-    def __exit__(self, *args):
-        self.ws.__exit__()
+            ws.send_json({"type": GQL_START, "id": op_id, "payload": payload})
+            yield cls(ws, op_id)
+
+    def __init__(self, ws, id):
+        self._ws = ws
+        self._id = id
 
     def __next__(self):
-        data = self.ws.receive_json()
-
-        if not self.acked:
-            assert data["type"] == GQL_CONNECTION_ACK
-            self.acked = True
-            data = self.ws.receive_json()
+        data = self._ws.receive_json()
 
         while data["type"] == GQL_CONNECTION_KEEP_ALIVE:
-            data = self.ws.receive_json()
+            data = self._ws.receive_json()
 
-        assert data["id"] == self.op_id
+        assert data["id"] == self._id
 
         if data["type"] == GQL_ERROR:
             raise ValueError(f"GQL Validation Error {repr(data['payload'])}")
 
         elif data["type"] == GQL_COMPLETE:
-            raise StopIteration
+            raise StopAsyncIteration
 
         else:
             assert data["type"] == GQL_DATA
             return data["payload"]
 
     def unsubscribe(self):
-        self.ws.send_json({"type": GQL_STOP})
-        time.sleep(1)
-        self.ws.receive_json()
+        self._ws.send_json({"type": GQL_STOP, "id": self._id})
 
 
 class GraphQLClient(TestClient):
@@ -120,19 +113,18 @@ class GraphQLClient(TestClient):
         return response.json()
 
     def subscribe(self, query: str, *, variables: Optional[dict] = None):
-        ws = self.websocket_connect("/", "graphql-ws")
-        return GraphQLSubscription(ws, query, variables)
+        return GQLSubscription._start(client=self, query=query, variables=variables)
 
 
 @pytest.fixture
 def blog_app(model_map):
-    app = BlogApp(debug=True, graphiql=False)
+    app = BlogApp(debug=False, graphiql=False)
     app.model_map = model_map
     yield app
 
 
 @pytest.fixture
-def client(blog_app: BlogApp, event_loop):
+def client(blog_app: BlogApp):
     with GraphQLClient(blog_app) as client:
         yield client
 
