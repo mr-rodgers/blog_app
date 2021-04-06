@@ -16,7 +16,12 @@ from blog_app.auth.types import (
 from blog_app.auth.context import Context
 from blog_app.auth.resolvers import send_login_code, login_with_code
 from blog_app.core import AppRequest, AppContext, Result
-from blog_app.core.protocols import AuthContext, CommentContext, PostContext
+from blog_app.core.protocols import (
+    AuthContext,
+    CommentContext,
+    PostContext,
+    ReactionContext,
+)
 from .conftest import MockAuthenticator
 
 
@@ -25,6 +30,7 @@ class MockAppContext:
     auth: AuthContext
     posts: PostContext
     comments: CommentContext
+    reactions: ReactionContext
     request: AppRequest
 
 
@@ -44,6 +50,7 @@ def info(authenticator, mocker):
             ),
             posts=mocker.Mock(PostContext),
             comments=mocker.Mock(CommentContext),
+            reactions=mocker.Mock(ReactionContext),
             request=mocker.Mock(AppRequest),
         )
     )

@@ -3,16 +3,27 @@ import base64
 import pickle
 import random
 import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
 from os import environ
-from typing import Any, Generic, List, Optional, Type, TypeVar, TypedDict
+from typing import Any, Generic, List, Optional, Type, TypeVar, TypedDict, cast
 
 import factory
 import factory.random
 import pytest
+import strawberry
 from pytest_factoryboy import LazyFixture, register
 from pytest_mock import MockerFixture
-from starlette.testclient import TestClient
-import strawberry
+from strawberry.asgi.constants import (
+    GQL_COMPLETE,
+    GQL_CONNECTION_ACK,
+    GQL_CONNECTION_INIT,
+    GQL_CONNECTION_KEEP_ALIVE,
+    GQL_DATA,
+    GQL_ERROR,
+    GQL_START,
+    GQL_STOP,
+)
 
 from blog_app import app, BlogApp
 from blog_app.core import Result
@@ -30,6 +41,7 @@ from .factories import (
     PostFactory,
     UserFactory,
 )
+from ._testclient import TestClient
 
 
 T = TypeVar("T", Post, Comment)
@@ -47,6 +59,46 @@ class GraphQLResponse(TypedDict):
     errors: Optional[List[Any]]
 
 
+class GQLSubscription(Iterator):
+    @classmethod
+    @contextmanager
+    def _start(cls, *, client, query, variables):
+        payload = {"query": query, "variables": {} if variables is None else variables}
+        op_id = str(hash(pickle.dumps(payload)))
+
+        with client.websocket_connect("/", "graphql-ws") as ws:
+            ws.send_json({"type": GQL_CONNECTION_INIT})
+            assert ws.receive_json()["type"] == GQL_CONNECTION_ACK
+
+            ws.send_json({"type": GQL_START, "id": op_id, "payload": payload})
+            yield cls(ws, op_id)
+
+    def __init__(self, ws, id):
+        self._ws = ws
+        self._id = id
+
+    def __next__(self):
+        data = self._ws.receive_json()
+
+        while data["type"] == GQL_CONNECTION_KEEP_ALIVE:
+            data = self._ws.receive_json()
+
+        assert data["id"] == self._id
+
+        if data["type"] == GQL_ERROR:
+            raise ValueError(f"GQL Validation Error {repr(data['payload'])}")
+
+        elif data["type"] == GQL_COMPLETE:
+            raise StopAsyncIteration
+
+        else:
+            assert data["type"] == GQL_DATA
+            return data["payload"]
+
+    def unsubscribe(self):
+        self._ws.send_json({"type": GQL_STOP, "id": self._id})
+
+
 class GraphQLClient(TestClient):
     def execute(
         self, query: str, *, variables: Optional[dict] = None, access_token: str = None
@@ -60,16 +112,19 @@ class GraphQLClient(TestClient):
         response = self.post("/graphql", json=data, headers=headers)
         return response.json()
 
+    def subscribe(self, query: str, *, variables: Optional[dict] = None):
+        return GQLSubscription._start(client=self, query=query, variables=variables)
+
 
 @pytest.fixture
 def blog_app(model_map):
-    app = BlogApp(debug=True, graphiql=False)
+    app = BlogApp(debug=False, graphiql=False)
     app.model_map = model_map
     yield app
 
 
 @pytest.fixture
-def client(blog_app: BlogApp, event_loop):
+def client(blog_app: BlogApp):
     with GraphQLClient(blog_app) as client:
         yield client
 

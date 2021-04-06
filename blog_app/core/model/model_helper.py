@@ -51,7 +51,6 @@ class ModelHelper:
 
     async def _update(self, item_id: int, *, where: Dict[str, Any] = None, **values):
         """Generic database record update function."""
-        print(values)
         async with self.engine.connect() as conn:
             stmt = (
                 self.table.update()

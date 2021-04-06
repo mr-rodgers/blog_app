@@ -21,9 +21,9 @@ services:
       - mysql
     volumes:
       - "./blog-app.toml:/blog-app/blog-app.toml"
-      # - "./blog_app:/blog-app/blog_app"
-      # - "./tests:/blog-app/tests"
-      # - "./cli:/blog-app/cli"
+      - "./blog_app:/blog-app/blog_app"
+      - "./tests:/blog-app/tests"
+      - "./cli:/blog-app/cli"
     command: poetry run devtools server
 
 volumes:

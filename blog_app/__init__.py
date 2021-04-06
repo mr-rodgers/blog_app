@@ -1,6 +1,6 @@
 import logging
 import traceback
-from typing import Any, List, Optional
+from typing import Any, AsyncGenerator, List, Optional, Union
 from starlette.types import Receive, Scope, Send
 
 import strawberry
@@ -11,6 +11,14 @@ from .adapters.auth0 import Auth0Authenticator
 from .auth.resolvers import send_login_code, login_with_code, refresh_login
 from .comments.resolvers import add_comment, update_comment, delete_comment
 from .comments.types import Comment
+from .events import (
+    Events,
+    Matcher,
+    CommentAddedEvent,
+    PostDeletedEvent,
+    PostUpdatedEvent,
+)
+from .events.demo_pubsub import DemoPubsub
 from .posts.resolvers import get_posts, create_post, update_post, delete_post
 from .posts.types import Post
 from .reactions.resolvers import set_reaction, delete_reaction
@@ -18,6 +26,9 @@ from .reactions.types import Reaction
 from .context import build_context
 from .database import create_model_map
 from .settings import load, Settings
+
+
+evts = Events()
 
 
 @strawberry.type
@@ -29,7 +40,6 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    # auth mutations
     send_login_code = strawberry.field(
         send_login_code,
         description="Send a code to the provided email address, which can"
@@ -45,28 +55,25 @@ class Mutation:
         description="Re-authenticate using the `refreshToken` from the last"
         " authentication.",
     )
-
-    # post mutations
     create_post = strawberry.field(
         create_post,
         description="Create a new post" " with supplied `title` and `content`.",
     )
     update_post = strawberry.field(
-        update_post,
+        evts.track(update_post, generating=PostUpdatedEvent),
         description="Update the post"
         " with the given `id`, setting the `title` and `content` to new values"
         " when provided.",
     )
     delete_post = strawberry.field(
-        delete_post,
+        evts.track(delete_post, generating=PostDeletedEvent),
         description="Delete the post"
         " with the given `id`. All attached comments (and reactions to those comments)"
         " will also be deleted.",
     )
-
-    # comment mutations
     add_comment = strawberry.field(
-        add_comment, description="Add a comment to the post with the given `postId`."
+        evts.track(add_comment, generating=CommentAddedEvent),
+        description="Add a comment to the post with the given `postId`.",
     )
     update_comment = strawberry.field(
         update_comment, description="Update the comment with the given `id`."
@@ -87,6 +94,21 @@ class Mutation:
     )
 
 
+@strawberry.type
+class Subscription:
+    @strawberry.subscription
+    def watch_post(
+        self, id: int
+    ) -> AsyncGenerator[
+        Union[PostUpdatedEvent, PostDeletedEvent, CommentAddedEvent], None
+    ]:
+        return evts.stream(
+            Matcher(PostUpdatedEvent, id=id),
+            Matcher(PostDeletedEvent, id=id),
+            Matcher(CommentAddedEvent, post_id=id),
+        )
+
+
 class BlogApp(GraphQL):
     settings: Settings
 
@@ -97,7 +119,12 @@ class BlogApp(GraphQL):
         additional_types = [Post, Comment, Reaction]
         kwargs.setdefault(
             "schema",
-            strawberry.Schema(query=Query, mutation=Mutation, types=additional_types),
+            strawberry.Schema(
+                query=Query,
+                mutation=Mutation,
+                subscription=Subscription,
+                types=additional_types,
+            ),
         )
         super().__init__(**kwargs)
 
@@ -119,11 +146,16 @@ class BlogApp(GraphQL):
             await super().__call__(scope, receive, send)
 
     async def startup(self):
-        ...
+        # here is where we can set up a bonafide Pubsub
+        # adapter.
+        evts.pubsub = DemoPubsub()
 
     async def shutdown(self):
         # the same db engine is shared by all modules
         await self.model_map["post"].engine.dispose()
+
+        assert evts.pubsub is not None
+        await evts.pubsub.dispose()
 
     async def get_context(
         self, request: AppRequest, response: Optional[Any] = None
@@ -146,6 +178,7 @@ class BlogApp(GraphQL):
             for error in result.errors:
                 logging.error("An unhandled application error has occurred.")
                 if error.original_error:
+                    logging.error(str(error.original_error))
                     logging.error(
                         "".join(traceback.format_tb(error.original_error.__traceback__))
                     )
@@ -153,5 +186,5 @@ class BlogApp(GraphQL):
         return data
 
 
-app = BlogApp(graphiql=False)
+app = BlogApp(debug=False, graphiql=False)
 _debug_app = BlogApp(debug=True, graphiql=True)
